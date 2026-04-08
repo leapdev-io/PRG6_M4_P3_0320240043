@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   ScrollView,
   FlatList,
   Alert,
+  TextInput,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 
@@ -37,6 +38,24 @@ const Home = () => {
   // 3. STATE UNTUK JAM DIGITAL
   const [currentTime, setCurrentTime] = useState("Memuat jam...");
 
+  // 4. STATE & REF UNTUK CATATAN
+  const [note, setNote] = useState("");
+  const noteInputRef = useRef(null);
+
+  // 5. OPTIMASI KOMPUTASI DENGAN useMemo
+  const attendanceStats = useMemo(() => {
+    console.log("Menghitung ulang statistik kehadiran...");
+
+    const presentCount = historyData.filter(
+      (item) => item.status === "Present",
+    ).length;
+    const absentCount = historyData.filter(
+      (item) => item.status === "Absent",
+    ).length;
+
+    return { totalPresent: presentCount, totalAbsent: absentCount };
+  }, [historyData]);
+
   // EFEK SIKLUS HIDUP (Mounting & Unmounting)
   useEffect(() => {
     const timer = setInterval(() => {
@@ -53,35 +72,29 @@ const Home = () => {
     return () => clearInterval(timer);
   }, []);
 
-  const presentCount = historyData.filter(
-    (item) => item.status === "Present",
-  ).length;
-  const absentCount = historyData.filter(
-    (item) => item.status === "Absent",
-  ).length;
-
   // FUNGSI LOGIKA ABSEN
   const handleCheckIn = () => {
     if (isCheckedIn) {
-      Alert.alert(
-        "Perhatian",
-        "Anda sudah melakukan Check In untuk kelas ini.",
-      );
+      Alert.alert("Perhatian", "Anda sudah melakukan Check In.");
       return;
     }
 
-    // 1. Buat data presensi baru
+    // Validasi catatan menggunakan useRef
+    if (note.trim() === "") {
+      Alert.alert("Peringatan", "Catatan kehadiran wajib diisi!");
+      noteInputRef.current?.focus();
+      return;
+    }
+
     const newAttendance = {
       id: Date.now().toString(),
       course: "Mobile Programming",
       date: new Date().toLocaleDateString("id-ID"),
       status: "Present",
+      note: note,
     };
 
-    // 2. Masukkan data baru ke urutan paling atas
     setHistoryData([newAttendance, ...historyData]);
-
-    // 3. Kunci tombol check in
     setIsCheckedIn(true);
 
     Alert.alert("Sukses", `Berhasil Check In pada pukul ${currentTime}`);
@@ -92,6 +105,9 @@ const Home = () => {
       <View>
         <Text style={styles.course}>{item.course}</Text>
         <Text style={styles.date}>{item.date}</Text>
+        {item.note ? (
+          <Text style={styles.noteHistory}>Catatan: {item.note}</Text>
+        ) : null}
       </View>
 
       <View style={styles.statusContainer}>
@@ -138,6 +154,16 @@ const Home = () => {
           <Text>08:00 - 10:00</Text>
           <Text>Lab 3</Text>
 
+          {!isCheckedIn && (
+            <TextInput
+              ref={noteInputRef}
+              style={styles.inputCatatan}
+              placeholder="Tulis catatan (cth: Hadir lab)"
+              value={note}
+              onChangeText={setNote}
+            />
+          )}
+
           <TouchableOpacity
             style={[
               styles.button,
@@ -152,11 +178,21 @@ const Home = () => {
           </TouchableOpacity>
         </View>
 
-        {/* Attendance Summary */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.subtitle}>Attendance Summary</Text>
-          <Text style={styles.summaryText}>Present : {presentCount}</Text>
-          <Text style={styles.summaryText}>Absent : {absentCount}</Text>
+        {/* Statistik Kehadiran */}
+        <View style={styles.statsCard}>
+          <View style={styles.statBox}>
+            <Text style={styles.statNumber}>
+              {attendanceStats.totalPresent}
+            </Text>
+            <Text style={styles.statLabel}>Total Present</Text>
+          </View>
+
+          <View style={styles.statBox}>
+            <Text style={[styles.statNumber, { color: "red" }]}>
+              {attendanceStats.totalAbsent}
+            </Text>
+            <Text style={styles.statLabel}>Total Absent</Text>
+          </View>
         </View>
 
         {/* Attendance History */}
@@ -236,22 +272,10 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 
-  summaryCard: {
-    backgroundColor: "white",
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 20,
-  },
-
   subtitle: {
     fontSize: 18,
     fontWeight: "bold",
     marginBottom: 10,
-  },
-
-  summaryText: {
-    fontSize: 16,
-    marginBottom: 5,
   },
 
   button: {
@@ -295,6 +319,13 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
+  noteHistory: {
+    fontSize: 12,
+    color: "#555",
+    marginTop: 4,
+    fontStyle: "italic",
+  },
+
   statusContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -308,6 +339,39 @@ const styles = StyleSheet.create({
   absent: {
     color: "red",
     fontWeight: "bold",
+  },
+
+  inputCatatan: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 15,
+    backgroundColor: "#fafafa",
+  },
+
+  statsCard: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    backgroundColor: "white",
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+
+  statBox: {
+    alignItems: "center",
+  },
+
+  statNumber: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "green",
+  },
+
+  statLabel: {
+    fontSize: 14,
+    color: "gray",
   },
 });
 
